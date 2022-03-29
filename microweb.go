@@ -192,11 +192,13 @@ import (
 	"bytes"
 	"encoding/json"
 	{{ if gt (len .Services) 0 -}}
+    "strings"
 	"net/http"
 	{{- end }}
 
 	"github.com/golang/protobuf/jsonpb"
 	{{ if gt (len .Services) 0 -}}
+    "github.com/mitchellh/mapstructure"
 	"github.com/go-chi/render"
 	"github.com/go-chi/chi/v5"
 	{{- end }}
@@ -229,9 +231,25 @@ func (h *web{{ $svc.Name }}Handler) {{ name . }}(w http.ResponseWriter, r *http.
 	{{- end }}
 
 	{{ if ne (getExtraImportAlias (importPath .Input)) "ptypesempty" -}}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusPreconditionFailed)
-		return
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/x-www-form-urlencoded")  {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusPreconditionFailed)
+			return
+		}
+		m := make(map[string]interface{})
+		for k, _ := range r.Form {
+			m[k] = r.Form.Get(k)
+		}
+		if err := mapstructure.WeakDecode(m, &req); err != nil {
+			http.Error(w, err.Error(), http.StatusPreconditionFailed)
+			return
+		}
+	} else if strings.Contains(contentType, "application/json") {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusPreconditionFailed)
+			return
+		}
 	}
 	{{- end }}
 
