@@ -239,7 +239,17 @@ func (h *web{{ $svc.Name }}Handler) {{ name . }}(w http.ResponseWriter, r *http.
 		}
 		m := make(map[string]interface{})
 		for k, _ := range r.Form {
-			m[k] = r.Form.Get(k)
+			v = r.Form.Get(k)
+			if strings.HasPrefix(v, "{") && json.Valid([]byte(v)) {
+				var vv map[string]interface{}
+				if err := json.Unmarshal([]byte(v), &vv); err != nil {
+					http.Error(w, err.Error(), http.StatusPreconditionFailed)
+					return
+				}
+				m[k] = vv
+			} else {
+				m[k] = v
+			}
 		}
 		if err := mapstructure.WeakDecode(m, &req); err != nil {
 			http.Error(w, err.Error(), http.StatusPreconditionFailed)
