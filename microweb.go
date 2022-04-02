@@ -264,7 +264,7 @@ func (h *web{{ $svc.Name }}Handler) {{ name . }}(w http.ResponseWriter, r *http.
 
 	{{ if ne (getExtraImportAlias (importPath .Output)) "ptypesempty" -}}
 	{{- if eq (handlerMethod .) "POST" }}
-	render.Status(r, http.StatusCreated)
+	render.Status(r, http.StatusOK)
 	render.JSON(w, r, resp)
 	{{- end }}
 	{{- if eq (handlerMethod .) "DELETE" }}
