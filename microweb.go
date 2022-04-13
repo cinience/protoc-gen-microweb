@@ -198,8 +198,9 @@ import (
 
 	"github.com/golang/protobuf/jsonpb"
 	{{ if gt (len .Services) 0 -}}
+	"go-micro.dev/v4/errors"
     "github.com/mitchellh/mapstructure"
-	"github.com/go-chi/render"
+	"github.com/cinience/render"
 	"github.com/go-chi/chi/v5"
 	{{- end }}
 	{{ range $key, $value := $imports }}
@@ -234,16 +235,31 @@ func (h *web{{ $svc.Name }}Handler) {{ name . }}(w http.ResponseWriter, r *http.
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "application/x-www-form-urlencoded")  {
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, err.Error(), http.StatusPreconditionFailed)
+			render.Status(r, http.StatusOK)
+			render.JSON(w, r, &struct {
+				Reason  string
+				Code    int32
+				Detail  string
+				Status  string
+				Success bool
+			}{"ParseRequestFailed", http.StatusBadRequest, err.Error(), "", false})
+
 			return
 		}
 		m := make(map[string]interface{})
 		for k, _ := range r.Form {
-			v = r.Form.Get(k)
+			v := r.Form.Get(k)
 			if strings.HasPrefix(v, "{") && json.Valid([]byte(v)) {
 				var vv map[string]interface{}
 				if err := json.Unmarshal([]byte(v), &vv); err != nil {
-					http.Error(w, err.Error(), http.StatusPreconditionFailed)
+					render.Status(r, http.StatusOK)
+					render.JSON(w, r, &struct {
+						Reason  string
+						Code    int32
+						Detail  string
+						Status  string
+						Success bool
+					}{"ParseRequestFailed", http.StatusBadRequest, err.Error(), "", false})
 					return
 				}
 				m[k] = vv
@@ -252,12 +268,28 @@ func (h *web{{ $svc.Name }}Handler) {{ name . }}(w http.ResponseWriter, r *http.
 			}
 		}
 		if err := mapstructure.WeakDecode(m, &req); err != nil {
-			http.Error(w, err.Error(), http.StatusPreconditionFailed)
+		    render.Status(r, http.StatusOK)
+			render.JSON(w, r, &struct {
+				Reason  string
+				Code    int32
+				Detail  string
+				Status  string
+				Success bool
+			}{"ParseRequestFailed", http.StatusBadRequest, err.Error(), "", false})
+			
 			return
 		}
 	} else if strings.Contains(contentType, "application/json") {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusPreconditionFailed)
+			render.Status(r, http.StatusOK)
+			render.JSON(w, r, &struct {
+				Reason  string
+				Code    int32
+				Detail  string
+				Status  string
+				Success bool
+			}{"ParseRequestFailed", http.StatusBadRequest, err.Error(), "", false})
+			
 			return
 		}
 	}
@@ -268,7 +300,17 @@ func (h *web{{ $svc.Name }}Handler) {{ name . }}(w http.ResponseWriter, r *http.
 		req,
 		resp,
 	); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		status := errors.FromError(err)
+		rst := &struct {
+			Reason string
+			Code   int32
+			Detail string
+			Status string
+			Success bool
+		}{status.Id, status.Code, status.Detail, status.Status, false}
+		// render.Status(r, int(status.Code))
+        render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, rst)
 		return
 	}
 
